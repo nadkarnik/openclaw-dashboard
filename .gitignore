@@ -4,7 +4,7 @@ package-lock.json
 
 # Data files (contain user-specific session data)
 data/
-*.json
+data/*.json
 
 # Logs
 *.log

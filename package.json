@@ -1,0 +1,36 @@
+{
+  "name": "openclaw-dashboard",
+  "version": "1.0.0",
+  "description": "A beautiful, real-time web dashboard for monitoring OpenClaw sessions, subagents, and chat history",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/YOUR-USERNAME/openclaw-dashboard.git"
+  },
+  "keywords": [
+    "openclaw",
+    "dashboard",
+    "ai",
+    "llm",
+    "monitoring",
+    "chat",
+    "assistant"
+  ],
+  "author": "OpenClaw Dashboard Contributors",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/YOUR-USERNAME/openclaw-dashboard/issues"
+  },
+  "homepage": "https://github.com/YOUR-USERNAME/openclaw-dashboard#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "cors": "^2.8.5"
+  }
+}
