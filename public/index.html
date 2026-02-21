@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpenClaw Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🐾 OpenClaw Dashboard</h1>
+      <div class="header-controls">
+        <button id="theme-toggle" title="Toggle dark mode">🌙</button>
+        <button id="refresh-btn" title="Refresh all data">🔄</button>
+        <div class="status-indicator" id="connection-status">●</div>
+      </div>
+    </header>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Token Usage</div>
+        <div class="stat-value" id="token-usage">-</div>
+        <div class="stat-progress">
+          <div class="progress-bar" id="token-progress"></div>
+        </div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-label">Active Sessions</div>
+        <div class="stat-value" id="session-count">-</div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-label">Subagents</div>
+        <div class="stat-value" id="subagent-count">-</div>
+      </div>
+      
+      <div class="stat-card">
+        <div class="stat-label">Uptime</div>
+        <div class="stat-value" id="uptime">-</div>
+      </div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="sessions">Sessions</button>
+      <button class="tab" data-tab="subagents">Subagents</button>
+      <button class="tab" data-tab="history">Chat History</button>
+      <button class="tab" data-tab="memory">Memory</button>
+      <button class="tab" data-tab="system">System</button>
+    </div>
+
+    <div class="tab-content active" id="sessions-tab">
+      <div class="section">
+        <h2>Active Sessions</h2>
+        <div id="sessions-list" class="list">
+          <div class="loading">Loading sessions...</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-content" id="subagents-tab">
+      <div class="section">
+        <h2>Subagents</h2>
+        <div class="section-header">
+          <button id="spawn-subagent-btn" class="btn-primary">+ Spawn Subagent</button>
+        </div>
+        <div id="subagents-list" class="list">
+          <div class="loading">Loading subagents...</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-content" id="history-tab">
+      <div class="section">
+        <h2>Chat History</h2>
+        <div class="search-box">
+          <input type="text" id="history-search" placeholder="Search messages...">
+          <select id="history-filter">
+            <option value="all">All Messages</option>
+            <option value="user">User Only</option>
+            <option value="assistant">Assistant Only</option>
+          </select>
+        </div>
+        <div id="history-list" class="list messages-list">
+          <div class="loading">Loading history...</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-content" id="memory-tab">
+      <div class="section">
+        <h2>Memory Files</h2>
+        <div class="search-box">
+          <input type="text" id="memory-search" placeholder="Search memory...">
+          <button id="memory-search-btn" class="btn-primary">Search</button>
+        </div>
+        <div class="memory-grid">
+          <div class="memory-sidebar">
+            <h3>Files</h3>
+            <div id="memory-files-list" class="list">
+              <div class="loading">Loading memory files...</div>
+            </div>
+          </div>
+          <div class="memory-content">
+            <div id="memory-viewer" class="memory-viewer">
+              <div class="placeholder">Select a memory file to view</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-content" id="system-tab">
+      <div class="section">
+        <h2>System Information</h2>
+        <div id="system-info" class="info-grid">
+          <div class="loading">Loading system info...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal for spawning subagent -->
+  <div id="spawn-modal" class="modal">
+    <div class="modal-content">
+      <span class="close">&times;</span>
+      <h2>Spawn Subagent</h2>
+      <form id="spawn-form">
+        <div class="form-group">
+          <label>Task Description</label>
+          <textarea id="spawn-task" rows="4" placeholder="Describe the task for the subagent..." required></textarea>
+        </div>
+        <div class="form-group">
+          <label>Label (optional)</label>
+          <input type="text" id="spawn-label" placeholder="e.g., research-task-1">
+        </div>
+        <div class="form-group">
+          <label>Model (optional)</label>
+          <input type="text" id="spawn-model" placeholder="Leave empty for default">
+        </div>
+        <div class="form-actions">
+          <button type="submit" class="btn-primary">Spawn</button>
+          <button type="button" class="btn-secondary" id="cancel-spawn">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
