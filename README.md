@@ -57,13 +57,13 @@ A beautiful, real-time web dashboard for monitoring [OpenClaw](https://openclaw.
 
 ## OpenClaw Integration ✅
 
-The dashboard is **fully integrated** with OpenClaw! Data is refreshed automatically every 60 seconds.
+The dashboard is **fully integrated** with OpenClaw! Data is refreshed on-demand to save tokens.
 
 ### How It Works
 
 1. **Data Bridge**: Dashboard reads from JSON files in `data/`
-2. **Cron Job**: Automatically refreshes data every minute
-3. **Real-time**: Always shows current session status, tokens, history, subagents
+2. **Manual Refresh**: Ask the assistant to refresh when you want updated data
+3. **Token Efficient**: Only uses API tokens when you explicitly request it
 
 ### Integrated Endpoints
 
@@ -74,9 +74,14 @@ The dashboard is **fully integrated** with OpenClaw! Data is refreshed automatic
 - ✅ `/api/memory` → Direct file access
 - 🔄 `/api/memory/search` → Queued processing (work in progress)
 
-### Manual Refresh
+### Refresh Dashboard Data
 
-To force a refresh: "Refresh the dashboard data"
+To refresh the data, simply say:
+> "Refresh the dashboard data"
+
+The assistant will call all necessary APIs and update the JSON files.
+
+**Note**: Automatic background refresh has been disabled to conserve tokens. You can re-enable it by setting up a cron job if desired (see `REFRESH.md`).
 
 See `REFRESH.md` for details on the data format and refresh mechanism.
 
