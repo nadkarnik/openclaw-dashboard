@@ -409,3 +409,317 @@ function formatUptime(seconds) {
   const minutes = Math.floor((seconds % 3600) / 60);
   return `${hours}h ${minutes}m`;
 }
+
+// File Manager
+let currentPath = '';
+let currentFile = null;
+let isEditing = false;
+
+async function loadFiles(path = '') {
+  try {
+    const data = await apiGet(`/api/files?path=${encodeURIComponent(path)}`);
+    if (!data) return;
+    
+    currentPath = path;
+    
+    // Update breadcrumb
+    updateBreadcrumb(path);
+    
+    // Render file list
+    const fileList = document.getElementById('file-list');
+    if (data.files.length === 0) {
+      fileList.innerHTML = '<div class="placeholder">No files in this directory</div>';
+      return;
+    }
+    
+    fileList.innerHTML = data.files.map(file => {
+      const icon = file.type === 'directory' ? '📁' : getFileIcon(file.name);
+      const size = file.type === 'file' ? formatFileSize(file.size) : '';
+      const hiddenClass = file.isHidden ? 'file-hidden' : '';
+      
+      return `
+        <div class="file-item ${hiddenClass}" data-path="${escapeHtml(file.path)}" data-type="${file.type}">
+          <span class="file-icon">${icon}</span>
+          <div class="file-info">
+            <div class="file-name">${escapeHtml(file.name)}</div>
+            <div class="file-meta">${size} ${formatDate(file.modified)}</div>
+          </div>
+        </div>
+      `;
+    }).join('');
+    
+    // Add click handlers
+    document.querySelectorAll('.file-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const path = item.dataset.path;
+        const type = item.dataset.type;
+        
+        if (type === 'directory') {
+          loadFiles(path);
+        } else {
+          loadFile(path);
+        }
+      });
+    });
+    
+  } catch (error) {
+    console.error('Failed to load files:', error);
+  }
+}
+
+function updateBreadcrumb(path) {
+  const breadcrumb = document.getElementById('file-breadcrumb');
+  const parts = path ? path.split('/') : [];
+  
+  let html = '<span class="breadcrumb-item" data-path="">📁 workspace</span>';
+  
+  let accumulated = '';
+  parts.forEach((part, i) => {
+    accumulated += (i > 0 ? '/' : '') + part;
+    html += `<span class="breadcrumb-separator">/</span>`;
+    html += `<span class="breadcrumb-item" data-path="${escapeHtml(accumulated)}">${escapeHtml(part)}</span>`;
+  });
+  
+  breadcrumb.innerHTML = html;
+  
+  // Add click handlers
+  breadcrumb.querySelectorAll('.breadcrumb-item').forEach(item => {
+    item.addEventListener('click', () => {
+      loadFiles(item.dataset.path);
+    });
+  });
+}
+
+async function loadFile(path) {
+  try {
+    const data = await apiGet(`/api/files/read?path=${encodeURIComponent(path)}`);
+    if (!data) return;
+    
+    currentFile = data;
+    isEditing = false;
+    
+    // Mark selected file
+    document.querySelectorAll('.file-item').forEach(item => {
+      item.classList.toggle('selected', item.dataset.path === path);
+    });
+    
+    // Show file content
+    const viewer = document.getElementById('file-viewer');
+    viewer.innerHTML = `
+      <div class="file-viewer-header">
+        <div class="file-viewer-title">📄 ${escapeHtml(data.path)}</div>
+        <div class="file-viewer-actions">
+          <button id="edit-file-btn" class="btn-secondary">✏️ Edit</button>
+          <button id="download-file-btn" class="btn-secondary">⬇️ Download</button>
+          <button id="delete-file-btn" class="btn-secondary">🗑️ Delete</button>
+        </div>
+      </div>
+      <div class="file-content">${escapeHtml(data.content)}</div>
+    `;
+    
+    // Add action handlers
+    document.getElementById('edit-file-btn').addEventListener('click', editFile);
+    document.getElementById('download-file-btn').addEventListener('click', downloadFile);
+    document.getElementById('delete-file-btn').addEventListener('click', () => deleteFile(data.path));
+    
+  } catch (error) {
+    console.error('Failed to load file:', error);
+  }
+}
+
+function editFile() {
+  if (!currentFile) return;
+  
+  isEditing = true;
+  const viewer = document.getElementById('file-viewer');
+  
+  viewer.innerHTML = `
+    <div class="file-viewer-header">
+      <div class="file-viewer-title">✏️ Editing: ${escapeHtml(currentFile.path)}</div>
+      <div class="file-viewer-actions">
+        <button id="save-file-btn" class="btn-primary">💾 Save</button>
+        <button id="cancel-edit-btn" class="btn-secondary">❌ Cancel</button>
+      </div>
+    </div>
+    <textarea class="file-editor" id="file-editor">${escapeHtml(currentFile.content)}</textarea>
+  `;
+  
+  document.getElementById('save-file-btn').addEventListener('click', saveFile);
+  document.getElementById('cancel-edit-btn').addEventListener('click', () => loadFile(currentFile.path));
+}
+
+async function saveFile() {
+  if (!currentFile) return;
+  
+  const content = document.getElementById('file-editor').value;
+  
+  try {
+    const response = await fetch(`${API_BASE}/api/files/write`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        path: currentFile.path,
+        content
+      })
+    });
+    
+    if (response.ok) {
+      alert('File saved successfully!');
+      loadFile(currentFile.path);
+      loadFiles(currentPath); // Refresh file list
+    } else {
+      const error = await response.json();
+      alert('Failed to save file: ' + error.error);
+    }
+  } catch (error) {
+    console.error('Failed to save file:', error);
+    alert('Failed to save file');
+  }
+}
+
+function downloadFile() {
+  if (!currentFile) return;
+  
+  const blob = new Blob([currentFile.content], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = currentFile.path.split('/').pop();
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function deleteFile(path) {
+  if (!confirm(`Are you sure you want to delete ${path}?`)) return;
+  
+  try {
+    const response = await fetch(`${API_BASE}/api/files/delete?path=${encodeURIComponent(path)}`, {
+      method: 'DELETE'
+    });
+    
+    if (response.ok) {
+      alert('File deleted successfully!');
+      document.getElementById('file-viewer').innerHTML = '<div class="placeholder">Select a file to view or edit</div>';
+      loadFiles(currentPath);
+    } else {
+      const error = await response.json();
+      alert('Failed to delete file: ' + error.error);
+    }
+  } catch (error) {
+    console.error('Failed to delete file:', error);
+    alert('Failed to delete file');
+  }
+}
+
+async function createNewFile() {
+  const filename = prompt('Enter file name:');
+  if (!filename) return;
+  
+  const path = currentPath ? `${currentPath}/${filename}` : filename;
+  
+  try {
+    const response = await fetch(`${API_BASE}/api/files/write`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        path,
+        content: ''
+      })
+    });
+    
+    if (response.ok) {
+      loadFiles(currentPath);
+      loadFile(path);
+    } else {
+      const error = await response.json();
+      alert('Failed to create file: ' + error.error);
+    }
+  } catch (error) {
+    console.error('Failed to create file:', error);
+    alert('Failed to create file');
+  }
+}
+
+async function createNewFolder() {
+  const foldername = prompt('Enter folder name:');
+  if (!foldername) return;
+  
+  const path = currentPath ? `${currentPath}/${foldername}/.gitkeep` : `${foldername}/.gitkeep`;
+  
+  try {
+    const response = await fetch(`${API_BASE}/api/files/write`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        path,
+        content: ''
+      })
+    });
+    
+    if (response.ok) {
+      loadFiles(currentPath);
+    } else {
+      const error = await response.json();
+      alert('Failed to create folder: ' + error.error);
+    }
+  } catch (error) {
+    console.error('Failed to create folder:', error);
+    alert('Failed to create folder');
+  }
+}
+
+function getFileIcon(filename) {
+  const ext = filename.split('.').pop().toLowerCase();
+  const icons = {
+    'md': '📝',
+    'txt': '📄',
+    'json': '📋',
+    'js': '📜',
+    'html': '🌐',
+    'css': '🎨',
+    'sh': '⚙️',
+    'log': '📊',
+    'png': '🖼️',
+    'jpg': '🖼️',
+    'jpeg': '🖼️',
+    'gif': '🖼️',
+    'pdf': '📕'
+  };
+  return icons[ext] || '📄';
+}
+
+function formatFileSize(bytes) {
+  if (bytes === 0) return '0 B';
+  const k = 1024;
+  const sizes = ['B', 'KB', 'MB', 'GB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+}
+
+function formatDate(isoString) {
+  const date = new Date(isoString);
+  const now = new Date();
+  const diff = now - date;
+  
+  if (diff < 60000) return 'just now';
+  if (diff < 3600000) return Math.floor(diff / 60000) + 'm ago';
+  if (diff < 86400000) return Math.floor(diff / 3600000) + 'h ago';
+  if (diff < 604800000) return Math.floor(diff / 86400000) + 'd ago';
+  
+  return date.toLocaleDateString();
+}
+
+// File manager event listeners
+document.getElementById('new-file-btn')?.addEventListener('click', createNewFile);
+document.getElementById('new-folder-btn')?.addEventListener('click', createNewFolder);
+document.getElementById('refresh-files-btn')?.addEventListener('click', () => loadFiles(currentPath));
+
+// Update loadTabData to include files
+const originalLoadTabData = window.loadTabData;
+window.loadTabData = function(tab) {
+  if (tab === 'files') {
+    loadFiles(currentPath);
+  } else if (originalLoadTabData) {
+    originalLoadTabData(tab);
+  }
+};

@@ -225,6 +225,145 @@ app.get('/api/system', async (req, res) => {
   }
 });
 
+// File Manager API
+const WORKSPACE_ROOT = path.join(process.env.HOME, '.openclaw/workspace');
+
+// Helper to sanitize and validate paths
+function validatePath(requestedPath) {
+  const normalized = path.normalize(requestedPath || '');
+  const fullPath = path.join(WORKSPACE_ROOT, normalized);
+  
+  // Ensure path is within workspace
+  if (!fullPath.startsWith(WORKSPACE_ROOT)) {
+    throw new Error('Access denied: path outside workspace');
+  }
+  
+  return fullPath;
+}
+
+// List files in directory
+app.get('/api/files', async (req, res) => {
+  try {
+    const dirPath = req.query.path || '';
+    const fullPath = validatePath(dirPath);
+    
+    const entries = await fs.readdir(fullPath, { withFileTypes: true });
+    const files = await Promise.all(
+      entries.map(async (entry) => {
+        const entryPath = path.join(fullPath, entry.name);
+        const stats = await fs.stat(entryPath);
+        const relativePath = path.relative(WORKSPACE_ROOT, entryPath);
+        
+        return {
+          name: entry.name,
+          path: relativePath,
+          type: entry.isDirectory() ? 'directory' : 'file',
+          size: stats.size,
+          modified: stats.mtime.toISOString(),
+          isHidden: entry.name.startsWith('.')
+        };
+      })
+    );
+    
+    // Sort: directories first, then files, hidden items last
+    files.sort((a, b) => {
+      if (a.isHidden !== b.isHidden) return a.isHidden ? 1 : -1;
+      if (a.type !== b.type) return a.type === 'directory' ? -1 : 1;
+      return a.name.localeCompare(b.name);
+    });
+    
+    res.json({
+      path: dirPath,
+      files
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Read file contents
+app.get('/api/files/read', async (req, res) => {
+  try {
+    const filePath = req.query.path;
+    if (!filePath) {
+      return res.status(400).json({ error: 'Path required' });
+    }
+    
+    const fullPath = validatePath(filePath);
+    const stats = await fs.stat(fullPath);
+    
+    if (!stats.isFile()) {
+      return res.status(400).json({ error: 'Not a file' });
+    }
+    
+    // Limit file size to 1MB for safety
+    if (stats.size > 1024 * 1024) {
+      return res.status(400).json({ error: 'File too large (>1MB)' });
+    }
+    
+    const content = await fs.readFile(fullPath, 'utf-8');
+    res.json({
+      path: filePath,
+      content,
+      size: stats.size,
+      modified: stats.mtime.toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Write file contents
+app.post('/api/files/write', async (req, res) => {
+  try {
+    const { path: filePath, content } = req.body;
+    
+    if (!filePath || content === undefined) {
+      return res.status(400).json({ error: 'Path and content required' });
+    }
+    
+    const fullPath = validatePath(filePath);
+    
+    // Create parent directories if needed
+    await fs.mkdir(path.dirname(fullPath), { recursive: true });
+    
+    await fs.writeFile(fullPath, content, 'utf-8');
+    
+    const stats = await fs.stat(fullPath);
+    res.json({
+      success: true,
+      path: filePath,
+      size: stats.size,
+      modified: stats.mtime.toISOString()
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete file or directory
+app.delete('/api/files/delete', async (req, res) => {
+  try {
+    const filePath = req.query.path;
+    if (!filePath) {
+      return res.status(400).json({ error: 'Path required' });
+    }
+    
+    const fullPath = validatePath(filePath);
+    const stats = await fs.stat(fullPath);
+    
+    if (stats.isDirectory()) {
+      await fs.rm(fullPath, { recursive: true });
+    } else {
+      await fs.unlink(fullPath);
+    }
+    
+    res.json({ success: true, path: filePath });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ 
